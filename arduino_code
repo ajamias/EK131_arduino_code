@@ -1,0 +1,153 @@
+// SONG SECTION
+
+#define NOTE_A4  440
+#define NOTE_D5  587
+#define NOTE_E5  659
+#define NOTE_FS5 740
+#define NOTE_G5  784
+#define NOTE_A5  880
+#define REST      0
+
+
+// change this to make the song slower or faster
+int tempo = 114;
+
+// change this to whichever pin you want to use
+int buzzer = 11;
+
+// notes of the moledy followed by the duration.
+// a 4 means a quarter note, 8 an eighteenth , 16 sixteenth, so on
+// !!negative numbers are used to represent dotted notes,
+// so -4 means a dotted quarter note, that is, a quarter plus an eighteenth!!
+int melody[] = {
+
+  // Never Gonna Give You Up - Rick Astley
+  // Score available at https://musescore.com/chlorondria_5/never-gonna-give-you-up_alto-sax
+  // Arranged by Chlorondria
+
+  NOTE_D5,-4, NOTE_E5,-4, NOTE_A4,4, //1
+  NOTE_E5,-4, NOTE_FS5,-4, NOTE_A5,16, NOTE_G5,16, NOTE_FS5,8,
+  NOTE_D5,-4, NOTE_E5,-4, NOTE_A4,2
+};
+
+// sizeof gives the number of bytes, each int value is composed of two bytes (16 bits)
+// there are two values per note (pitch and duration), so for each note there are four bytes
+int notes = sizeof(melody) / sizeof(melody[0]) / 2;
+
+// this calculates the duration of a whole note in ms
+int wholenote = (60000 * 4) / tempo;
+
+int divider = 0, noteDuration = 0;
+
+
+
+
+
+
+
+
+
+
+//initialize various components
+
+#include <Wire.h>
+#include <LiquidCrystal_I2C.h>
+
+
+int sensorPin = 0;
+int buzzerPin = 11;
+int redLEDPin = 2;
+LiquidCrystal_I2C lcd(0x20,16,2);
+
+
+
+
+
+void setup()
+{
+  Serial.begin(9600);
+  lcd.init(); // initialize the lcd
+  lcd.backlight();
+  lcd.setCursor(1,0);
+  lcd.print("GET RICKROLLED");
+  pinMode(buzzerPin, OUTPUT);
+  pinMode(redLEDPin, OUTPUT);
+  // iterate over the notes of the melody.
+  // Remember, the array is twice the number of notes (notes + durations)
+  for (int thisNote = 0; thisNote < notes * 2; thisNote = thisNote + 2) {
+
+    // calculates the duration of each note
+    divider = melody[thisNote + 1];
+    if (divider > 0) {
+      // regular note, just proceed
+      noteDuration = (wholenote) / divider;
+    } else if (divider < 0) {
+      // dotted notes are represented with negative durations!!
+      noteDuration = (wholenote) / abs(divider);
+      noteDuration *= 1.5; // increases the duration in half for dotted notes
+    }
+
+    // we only play the note for 90% of the duration, leaving 10% as a pause
+    tone(buzzer, melody[thisNote], noteDuration * 0.9);
+
+    // Wait for the specief duration before playing the next note.
+    delay(noteDuration);
+
+    // stop the waveform generation before the next note.
+    noTone(buzzer);
+  }
+  lcd.setCursor(1,0);
+  lcd.print("              ");
+}
+
+void loop()
+{
+   
+  // Get the voltage reading from the TMP36
+  int reading = analogRead(sensorPin);
+
+  // Convert that reading into voltage
+  float voltage = reading * 5.0 / 1024.0;
+
+  // Convert the voltage into the temperature in Celsius
+  float temperatureC = (voltage - 0.5) * 100;
+  Serial.print(temperatureC);
+  Serial.print("\n");
+  
+  // now convert to Fahrenheit
+  float temperatureF = (temperatureC * 9.0 / 5.0) + 32.0;
+  
+  lcd.setCursor(0,0);
+  lcd.print(temperatureF);
+  lcd.print(" F");
+  lcd.setCursor(0,1);
+  lcd.print(temperatureC);
+  lcd.print(" C");
+
+  delay(500);
+  
+
+  // buzzer + red LED
+  if (temperatureC < 20.0 || temperatureC > 25) {
+    lcd.setCursor(8,0);
+    lcd.print("DANGER");
+    lcd.setCursor(8,1);
+    if (temperatureC < 20.0) {
+      lcd.print("TOO COLD");
+    } else {
+      lcd.print("TOO HOT");
+    }
+    tone(buzzerPin, 500 + (temperatureC - 25) * 20);
+    digitalWrite(redLEDPin, HIGH);
+    delay(600 - (temperatureC - 25) * 75);
+    noTone(buzzerPin);
+    digitalWrite(redLEDPin, LOW);
+  } else {
+    lcd.setCursor(8,0);
+    lcd.print("      ");
+    lcd.setCursor(8,1);
+    lcd.print("       ");
+    noTone(buzzerPin);
+    digitalWrite(redLEDPin, LOW);
+  }
+}
